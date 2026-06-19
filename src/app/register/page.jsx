@@ -106,7 +106,7 @@ export default function RegisterPage() {
                 variant="bordered"
                 radius="lg"
                 required
-                className="w-full text-gray-900"
+                className="w-full text-gray-900 bg-gray-50 focus:border-gray-500"
               />
             </div>
 
@@ -124,7 +124,7 @@ export default function RegisterPage() {
                 variant="bordered"
                 radius="lg"
                 required
-                className="w-full text-gray-900"
+                className="w-full text-gray-900 bg-gray-50 focus:border-gray-500"
               />
             </div>
 
@@ -171,7 +171,7 @@ export default function RegisterPage() {
                 variant="bordered"
                 radius="lg"
                 required
-                className="w-full text-gray-900"
+                className="w-full text-gray-900 bg-gray-50 focus:border-gray-500"
               />
             </div>
 
@@ -189,7 +189,7 @@ export default function RegisterPage() {
                 variant="bordered"
                 radius="lg"
                 required
-                className="w-full text-gray-900"
+                className="w-full text-gray-900 bg-gray-50 focus:border-gray-500"
               />
             </div>
 

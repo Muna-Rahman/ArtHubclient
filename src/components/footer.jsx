@@ -83,7 +83,7 @@ export default function Footer() {
                     placeholder="Enter your email" 
                     type="email" 
                     required
-                    className="flex-grow focus:border-amber-500"
+                    className="w-full text-gray-900 bg-gray-50 focus:border-gray-500"
                   />
                   <Button 
                     type="submit" 
