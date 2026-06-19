@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "@gravity-ui/icons";
 export default function HeroBanner() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Curated High-resolution digital art examples matching assignment aesthetics
+  
   const slides = [
     {
       image: "https://images.unsplash.com/photo-1579965342575-16428a7c8881?q=80&w=1600&auto=format&fit=crop",
@@ -19,7 +19,6 @@ export default function HeroBanner() {
     }
   ];
 
-  // Auto-advance loop representing clean production layout execution
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -33,7 +32,7 @@ export default function HeroBanner() {
   return (
     <section className="relative w-full h-[400px] sm:h-[500px] lg:h-[600px] bg-gray-950 overflow-hidden" aria-roledescription="carousel">
       
-      {/* Structural Slide Container */}
+    
       <div className="relative w-full h-full">
         {slides.map((slide, index) => {
           const isActive = index === currentSlide;
@@ -45,7 +44,7 @@ export default function HeroBanner() {
               }`}
               aria-hidden={!isActive}
             >
-              {/* Image Layer with a subtle overlay to maintain deep UI contrast */}
+              
               <div 
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-10000 scale-105"
                 style={{ 
@@ -57,7 +56,7 @@ export default function HeroBanner() {
         })}
       </div>
 
-      {/* Manual Layout Indicator Chevron Triggers */}
+     
       <button
         onClick={prevSlide}
         className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 rounded-full bg-black/40 border border-white/10 text-white hover:bg-black/70 transition-colors focus:outline-none hidden sm:flex cursor-pointer"
@@ -73,7 +72,7 @@ export default function HeroBanner() {
         <ChevronRight className="h-6 w-6" />
       </button>
 
-      {/* Structural Pagination Dot Control Deck */}
+     
       <div className="absolute bottom-6 left-0 right-0 z-20 flex justify-center gap-3">
         {slides.map((_, index) => (
           <button
