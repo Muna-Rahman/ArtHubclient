@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Button, Input, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@heroui/react";
+import { Button } from "@heroui/react";
 
 export default function UserDashboard() {
   const mockUserEmail = "buyer@example.com"; 
@@ -19,13 +19,13 @@ export default function UserDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white p-8 space-y-12">
+    <div className="min-h-screen bg-black text-white p-8 space-y-12 font-sans">
       <div>
         <h1 className="text-3xl font-black tracking-tight">User Operations Command</h1>
         <p className="text-zinc-500 text-sm mt-1">Manage acquired artworks, view tier subscriptions, and modify configurations.</p>
       </div>
 
-
+     
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { title: "Free (Default)", limit: "3 Paintings", cost: "$0", active: true },
@@ -39,33 +39,40 @@ export default function UserDashboard() {
             </div>
             <p className="text-2xl font-black mt-4 text-orange-400">{tier.cost}</p>
             <p className="text-zinc-500 text-xs mt-1">Limit Capacity: {tier.limit}</p>
-            {!tier.active && <Button size="sm" className="w-full mt-4 bg-zinc-800 text-white">Upgrade via Stripe</Button>}
+            {!tier.active && <Button size="sm" className="w-full mt-4 bg-zinc-800 text-white rounded-xl">Upgrade via Stripe</Button>}
           </div>
         ))}
       </div>
 
+     
       <div className="space-y-4">
         <h2 className="text-xl font-bold">Purchase Log Ledger</h2>
-        {loading ? (
-          <div className="h-32 bg-zinc-900/50 animate-pulse rounded-2xl" />
-        ) : (
-          <Table aria-label="Purchase history tracking information panel table" className="text-zinc-300">
-            <TableHeader>
-              <TableColumn className="bg-zinc-900 text-zinc-400 font-bold border-b border-zinc-800">Masterpiece Title</TableColumn>
-              <TableColumn className="bg-zinc-900 text-zinc-400 font-bold border-b border-zinc-800">Price Paid</TableColumn>
-              <TableColumn className="bg-zinc-900 text-zinc-400 font-bold border-b border-zinc-800">Transaction Timestamp</TableColumn>
-            </TableHeader>
-            <TableBody>
+        
+        <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20 backdrop-blur-md">
+          {/* Table Header Row Layout */}
+          <div className="grid grid-cols-12 bg-zinc-900/80 p-4 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
+            <div className="col-span-6">Masterpiece Title</div>
+            <div className="col-span-3">Price Paid</div>
+            <div className="col-span-3 text-right">Transaction Timestamp</div>
+          </div>
+
+         
+          {loading ? (
+            <div className="p-8 text-center text-zinc-500 text-sm animate-pulse">Syncing user ledger transactions...</div>
+          ) : purchases.length > 0 ? (
+            <div className="divide-y divide-zinc-900">
               {purchases.map((tx, idx) => (
-                <TableRow key={idx} className="border-b border-zinc-900 hover:bg-zinc-900/40 transition-colors">
-                  <TableCell className="font-semibold text-white">{tx.artworkTitle}</TableCell>
-                  <TableCell className="text-orange-400 font-bold">${tx.amount}</TableCell>
-                  <TableCell className="text-zinc-500 text-xs">{new Date(tx.date).toLocaleDateString()}</TableCell>
-                </TableRow>
+                <div key={idx} className="grid grid-cols-12 p-4 items-center text-sm hover:bg-zinc-900/30 transition-colors">
+                  <div className="col-span-6 font-semibold text-white truncate pr-2">{tx.artworkTitle}</div>
+                  <div className="col-span-3 text-orange-400 font-bold">${tx.amount}</div>
+                  <div className="col-span-3 text-zinc-500 text-xs text-right">{new Date(tx.date).toLocaleDateString()}</div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
-        )}
+            </div>
+          ) : (
+            <div className="p-12 text-center text-zinc-500 text-sm">No acquired masterpieces found in your collection history log.</div>
+          )}
+        </div>
       </div>
     </div>
   );

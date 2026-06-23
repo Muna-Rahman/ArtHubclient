@@ -42,11 +42,13 @@ export default function RegisterPage() {
     setLoading(true);
     
     try {
+      // We pass the role variable at the root level so BetterAuth grabs it correctly during account registration
       const { data, error: authError } = await authClient.signUp.email({
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        callbackURL: "/",
+        role: formData.role, 
+        callbackURL: formData.role === "artist" ? "/dashboard/artist" : "/",
         data: {
           role: formData.role
         }
@@ -55,7 +57,8 @@ export default function RegisterPage() {
       if (authError) {
         setError(authError.message || "Registration failed. Please try again.");
       } else {
-        router.push("/");
+        // Automatically send artists to their specific portfolio workspace or regular buyers back home
+        router.push(formData.role === "artist" ? "/dashboard/artist" : "/");
         router.refresh();
       }
     } catch (err) {
@@ -70,7 +73,6 @@ export default function RegisterPage() {
       
       <Card className="w-full max-w-md p-6 shadow-sm border border-gray-200 bg-white rounded-2xl">
         
-       
         <div className="flex flex-col gap-1 pb-4 text-center">
           <h2 className="text-2xl font-black tracking-tight text-gray-950">
             Create your account
@@ -82,7 +84,6 @@ export default function RegisterPage() {
 
         <div className="h-[1px] w-full bg-gray-100 my-2" />
 
-       
         <div className="py-4 space-y-5">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl font-medium text-center">
@@ -92,7 +93,6 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             
-     
             <div className="flex flex-col gap-1.5">
               <label htmlFor="name" className="text-sm font-semibold text-gray-700">
                 Full Name
@@ -110,7 +110,6 @@ export default function RegisterPage() {
               />
             </div>
 
-       
             <div className="flex flex-col gap-1.5">
               <label htmlFor="email" className="text-sm font-semibold text-gray-700">
                 Email Address
@@ -128,7 +127,6 @@ export default function RegisterPage() {
               />
             </div>
 
-           
             <div className="flex flex-col gap-2">
               <span className="text-sm font-semibold text-gray-800">Select Profile Role</span>
               <div className="grid grid-cols-2 gap-3">
@@ -157,7 +155,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-       
             <div className="flex flex-col gap-1.5">
               <label htmlFor="password" className="text-sm font-semibold text-gray-700">
                 Password
@@ -175,7 +172,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            
             <div className="flex flex-col gap-1.5">
               <label htmlFor="confirmPassword" className="text-sm font-semibold text-gray-700">
                 Confirm Password
@@ -193,7 +189,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            
             <div className="pt-4">
               <Button
                 type="submit"
