@@ -19,28 +19,27 @@ export default function ArtworkDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState(false);
 
+  
   useEffect(() => {
     setLoading(true);
     setErrorState(false);
     
-    
-    fetch("/api/artworks")
-      .then((res) => res.json())
+  
+    fetch(`http://localhost:5000/api/artworks/${id}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Not Found");
+        return res.json();
+      })
       .then((data) => {
-        if (data.success && data.artworks) {
-          const found = data.artworks.find((item) => item._id === id);
-          if (found) {
-            setArtwork(found);
-          } else {
-            setErrorState(true);
-          }
+        if (data.success && data.artwork) {
+          setArtwork(data.artwork);
         } else {
           setErrorState(true);
         }
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Fetch operational error:", err);
+        console.error("Details target endpoint connection error:", err);
         setErrorState(true);
         setLoading(false);
       });

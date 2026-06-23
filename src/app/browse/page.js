@@ -27,26 +27,20 @@ function BrowseContent() {
   const categoryParam = searchParams.get("category") || "all";
   const sortParam = searchParams.get("sort") || "newest";
 
+  
   useEffect(() => {
     setLoading(true);
-    fetch("/api/artworks?limit=100")
+   
+    fetch("http://localhost:5000/api/artworks")
       .then((res) => res.json())
       .then((data) => {
-        if (data.artworks && data.artworks.length > 0) {
+        if (data.success && data.artworks) {
           setArtworks(data.artworks);
-        } else {
-          setArtworks([
-            { _id: "m1", title: "Neon Horizon", price: 250, artistName: "A. Chowdhury", category: "digital", image: "https://picsum.photos/600/400?random=1" },
-            { _id: "m2", title: "Ethereal Echoes", price: 420, artistName: "S. Miah", category: "painting", image: "https://picsum.photos/600/400?random=2" },
-            { _id: "m3", title: "Abstract Serenity", price: 180, artistName: "R. Rahman", category: "painting", image: "https://picsum.photos/600/400?random=3" },
-            { _id: "m4", title: "Shattered Light", price: 310, artistName: "A. Chowdhury", category: "sculpture", image: "https://picsum.photos/600/400?random=4" },
-            { _id: "m5", title: "Cybernetic Genesis", price: 550, artistName: "S. Miah", category: "digital", image: "https://picsum.photos/600/400?random=5" },
-            { _id: "m6", title: "Timeless Fluidity", price: 290, artistName: "R. Rahman", category: "photography", image: "https://picsum.photos/600/400?random=6" }
-          ]);
         }
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Browse live channel error:", err);
         setLoading(false);
       });
   }, []);
