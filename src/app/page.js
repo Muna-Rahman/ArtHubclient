@@ -18,7 +18,6 @@ const staggerContainer = {
   }
 };
 
-
 const bannerSlides = [
   {
     title: "Discover & Buy Original Art",
@@ -45,10 +44,11 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  
   useEffect(() => {
     setLoading(true);
-    fetch("http://localhost:5000/api/artworks?limit=6")
+
+   
+    fetch(`http://localhost:5000/api/artworks?limit=6&t=${Date.now()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.artworks && data.artworks.length > 0) {
@@ -62,14 +62,13 @@ export default function HomePage() {
       });
   }, []);
 
- 
   useEffect(() => {
     const slideTimer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % bannerSlides.length);
     }, 5000);
     return () => clearInterval(slideTimer);
   }, []);
-
+{/* mock value only for the top artist part*/}
   const topArtists = [
     { id: "1", name: "A. Chowdhury", sales: "42 Sales", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop" },
     { id: "2", name: "S. Miah", sales: "38 Sales", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop" },
@@ -86,7 +85,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-black text-white pb-20 overflow-x-hidden">
       
-      
+      {/* Hero banner part*/}
       <section className="relative h-[70vh] flex items-center justify-center border-b border-zinc-800 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
@@ -132,7 +131,6 @@ export default function HomePage() {
           </motion.div>
         </div>
 
-       
         <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-3 z-20">
           {bannerSlides.map((_, index) => (
             <button
@@ -147,7 +145,7 @@ export default function HomePage() {
         </div>
       </section>
 
-     
+      {/* DFA part*/}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <motion.div 
           initial="hidden"
@@ -179,6 +177,7 @@ export default function HomePage() {
           >
             {featuredArt.map((art) => (
               <motion.div key={art._id} variants={fadeInUp} whileHover={{ y: -6 }} className="h-full">
+                {/* 🌟 FIXED ROUTE LINK: Points to browse/[id] instead of artworks/[id] */}
                 <Link href={`/browse/${art._id}`}>
                   <div className="border border-zinc-800 bg-zinc-900/30 backdrop-blur-sm rounded-2xl overflow-hidden h-full flex flex-col justify-between cursor-pointer hover:border-zinc-700 transition-all duration-300 group">
                     <div className="relative overflow-hidden h-56 w-full bg-zinc-900">
@@ -209,7 +208,7 @@ export default function HomePage() {
         )}
       </section>
 
-     
+      {/* EXTRA SECTION 1: TOP ARTISTS */}
       <section className="bg-zinc-900/20 border-y border-zinc-800/80 py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-12">
@@ -245,7 +244,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      
+      {/* EXTRA SECTION 2: ART CATEGORIES */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="mb-12">
           <h2 className="text-2xl md:text-3xl font-bold">Explore Categories</h2>

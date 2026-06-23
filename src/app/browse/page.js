@@ -34,7 +34,7 @@ function BrowseContent() {
     fetch("http://localhost:5000/api/artworks")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.artworks) {
+        if (data.success && data.artworks && data.artworks.length > 0) {
           setArtworks(data.artworks);
         }
         setLoading(false);
