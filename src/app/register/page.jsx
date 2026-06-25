@@ -42,25 +42,43 @@ export default function RegisterPage() {
     setLoading(true);
     
     try {
-      // We pass the role variable at the root level so BetterAuth grabs it correctly during account registration
-      const { data, error: authError } = await authClient.signUp.email({
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        role: formData.role, 
-        callbackURL: formData.role === "artist" ? "/dashboard/artist" : "/",
-        data: {
-          role: formData.role
-        }
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000";
+
+      // 🌟 STEP 1: Direct dispatch to the explicit endpoint to bypass client stripping rules
+      const response = await fetch(`${apiBaseUrl}/api/auth/register-direct`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role, 
+        }),
       });
 
-      if (authError) {
-        setError(authError.message || "Registration failed. Please try again.");
-      } else {
-        // Automatically send artists to their specific portfolio workspace or regular buyers back home
-        router.push(formData.role === "artist" ? "/dashboard/artist" : "/");
-        router.refresh();
+      const resData = await response.json();
+
+      if (!response.ok || !resData.success) {
+        setError(resData.message || "Registration processing failed.");
+        setLoading(false);
+        return;
       }
+
+      // 🌟 STEP 2: Log the user in to seamlessly generate the session collection link
+      const loginRes = await authClient.signIn.email({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (loginRes.error) {
+        // Fallback redirection to complete token mounting if cookies delay
+        window.location.href = "/login";
+      } else {
+        window.location.href = formData.role === "artist" ? "/dashboard/artist" : "/";
+      }
+
     } catch (err) {
       setError("An unexpected system error occurred.");
     } finally {

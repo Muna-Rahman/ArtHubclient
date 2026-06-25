@@ -24,36 +24,33 @@ export default function LoginPage() {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-
   const handleCredentialsLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
+    
       const { data, error: authError } = await authClient.signIn.email({
         email: formData.email,
         password: formData.password,
-       
       });
 
       if (authError) {
         setError(authError.message || "Invalid credentials provided.");
         setLoading(false);
       } else {
-        
-        const session = await authClient.useSession.getState();
-        const role = session?.data?.user?.role || "user";
 
-        if (role === "admin") {
-          router.push("/dashboard/admin");
-        } else if (role === "artist") {
-          router.push("/dashboard/artist");
-        } else {
-          router.push("/");
-        }
+        const userRole = data?.user?.role || "user";
+
         
-        router.refresh();
+        if (userRole === "admin") {
+          window.location.href = "/dashboard/admin";
+        } else if (userRole === "artist") {
+          window.location.href = "/dashboard/artist";
+        } else {
+          window.location.href = "/";
+        }
       }
     } catch (err) {
       setError("An unexpected authentication error occurred.");
@@ -61,14 +58,12 @@ export default function LoginPage() {
     }
   };
 
-
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
     try {
       await authClient.signIn.social({
         provider: "google",
-        
         callbackURL: "/",
       });
     } catch (err) {
@@ -82,7 +77,6 @@ export default function LoginPage() {
       
       <Card className="w-full max-w-md p-6 shadow-sm border border-gray-200 bg-white rounded-2xl">
         
-     
         <div className="flex flex-col gap-1 pb-4 text-center">
           <h2 className="text-2xl font-black tracking-tight text-gray-950">
             Welcome back
@@ -94,7 +88,6 @@ export default function LoginPage() {
 
         <div className="h-[1px] w-full bg-gray-100 my-2" />
 
-      
         <div className="py-4 space-y-5">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl font-medium text-center">
@@ -102,7 +95,6 @@ export default function LoginPage() {
             </div>
           )}
 
-         
           <form onSubmit={handleCredentialsLogin} className="space-y-4">
             
             <div className="flex flex-col gap-1.5">
@@ -110,7 +102,6 @@ export default function LoginPage() {
                 Email Address
               </label>
               <Input
-            
                 id="email"
                 type="email"
                 placeholder="example@arthub.com"
@@ -140,7 +131,6 @@ export default function LoginPage() {
               />
             </div>
 
-          
             <div className="pt-2">
               <Button
                 type="submit"
@@ -154,14 +144,12 @@ export default function LoginPage() {
             </div>
           </form>
 
-          
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="flex-shrink mx-4 text-gray-400 text-xs font-bold uppercase tracking-wider">or continue with</span>
             <div className="flex-grow border-t border-gray-200"></div>
           </div>
 
-          
           <div>
             <Button
               type="button"
@@ -184,7 +172,6 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          
           <p className="text-center text-sm text-gray-600 mt-4">
             New to the marketplace?{" "}
             <Link href="/register" className="font-semibold text-amber-600 hover:text-amber-500 transition">
