@@ -76,7 +76,17 @@ export default function RegisterPage() {
         // Fallback redirection to complete token mounting if cookies delay
         window.location.href = "/login";
       } else {
-        window.location.href = formData.role === "artist" ? "/dashboard/artist" : "/";
+        // 🌟 FIXED REGISTRATION FLOW: Pull full session details to safely route buyers and creators
+        const sessionRes = await authClient.getSession();
+        const savedRole = sessionRes?.data?.user?.role || "user";
+
+        if (savedRole === "admin") {
+          window.location.href = "/dashboard/admin";
+        } else if (savedRole === "artist") {
+          window.location.href = "/dashboard/artist";
+        } else {
+          window.location.href = "/dashboard/user"; 
+        }
       }
 
     } catch (err) {

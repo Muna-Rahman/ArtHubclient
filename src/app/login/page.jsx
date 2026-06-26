@@ -24,36 +24,39 @@ export default function LoginPage() {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
+  // 🌟 FIXED CREDENTIALS FLOW: Correctly requests session details to verify target dashboards
   const handleCredentialsLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-    
       const { data, error: authError } = await authClient.signIn.email({
         email: formData.email,
         password: formData.password,
       });
 
       if (authError) {
-        setError(authError.message || "Invalid credentials provided.");
+        setError(authError.message || "Invalid email or password.");
         setLoading(false);
+        return;
+      }
+
+      // Fetch full active database session context to read custom properties accurately
+      const sessionRes = await authClient.getSession();
+      const userRole = sessionRes?.data?.user?.role || "user";
+
+      // Secure dynamic routing block based on evaluated database role strings
+      if (userRole === "admin") {
+        window.location.href = "/dashboard/admin";
+      } else if (userRole === "artist") {
+        window.location.href = "/dashboard/artist";
       } else {
-
-        const userRole = data?.user?.role || "user";
-
-        
-        if (userRole === "admin") {
-          window.location.href = "/dashboard/admin";
-        } else if (userRole === "artist") {
-          window.location.href = "/dashboard/artist";
-        } else {
-          window.location.href = "/";
-        }
+        window.location.href = "/dashboard/user";
       }
     } catch (err) {
       setError("An unexpected authentication error occurred.");
+    } finally {
       setLoading(false);
     }
   };

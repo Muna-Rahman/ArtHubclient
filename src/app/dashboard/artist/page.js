@@ -1,13 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Input } from "@heroui/react";
+import { authClient } from "@/lib/auth-client";
 
 export default function ArtistDashboard() {
-  const artistEmail = "artist1@arthub.com"; 
+  const router = useRouter();
+  
+  // 🌟 SECURE SESSION LAYER: Mount session state and load active database user identity
+  const { data: session, isPending } = authClient.useSession(); 
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false); 
+
+  const artistEmail = session?.user?.email;
+  const artistName = session?.user?.name || "Anonymous Artist";
 
   const [formData, setFormData] = useState({ 
     title: "", 
@@ -17,9 +25,21 @@ export default function ArtistDashboard() {
     image: "" 
   });
 
+  // 🌟 SECURITY ROLE GUARD: Intercept non-permitted accounts immediately
+  useEffect(() => {
+    if (!isPending) {
+      if (!session || session?.user?.role !== "artist") {
+        window.location.href = "/login";
+      }
+    }
+  }, [session, isPending]);
+
   const fetchArtworks = () => {
+    if (!artistEmail) return;
     setLoading(true);
-    fetch(`http://localhost:5000/api/artist/artworks?email=${artistEmail}`)
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    
+    fetch(`${apiBaseUrl}/api/artist/artworks?email=${encodeURIComponent(artistEmail)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.artworks) setArtworks(data.artworks);
@@ -28,8 +48,12 @@ export default function ArtistDashboard() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchArtworks(); }, []);
-
+  // Sync dataset once account context loads successfully
+  useEffect(() => {
+    if (artistEmail) {
+      fetchArtworks();
+    }
+  }, [artistEmail]);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -38,7 +62,6 @@ export default function ArtistDashboard() {
     setUploading(true);
     const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
     
-  
     const uploadPayload = new FormData();
     uploadPayload.append("image", file);
 
@@ -50,7 +73,6 @@ export default function ArtistDashboard() {
       const data = await response.json();
 
       if (data.success) {
-     
         setFormData((prev) => ({ ...prev, image: data.data.url }));
       } else {
         alert("Failed to store asset to imgBB infrastructure cluster.");
@@ -69,9 +91,10 @@ export default function ArtistDashboard() {
       return;
     }
 
-    const payload = { ...formData, artistName: "A. Chowdhury", artistEmail };
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const payload = { ...formData, artistName, artistEmail };
     
-    fetch("http://localhost:5000/api/artworks", {
+    fetch(`${apiBaseUrl}/api/artworks`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -81,29 +104,59 @@ export default function ArtistDashboard() {
       alert("Composition successfully published to live marketplace catalog cluster!");
       setFormData({ title: "", price: "", category: "painting", description: "", image: "" });
       fetchArtworks();
-    });
+    })
+    .catch((err) => console.error("Error publishing artwork:", err));
   };
 
   const handleDelete = (id) => {
     if (!confirm("Are you sure you want to delete this artwork?")) return;
-    fetch(`http://localhost:5000/api/artworks/${id}`, { method: "DELETE" })
-      .then(() => fetchArtworks());
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    
+    fetch(`${apiBaseUrl}/api/artworks/${id}`, { method: "DELETE" })
+      .then(() => fetchArtworks())
+      .catch((err) => console.error("Error deleting artwork:", err));
   };
+
+  // Prevent flash rendering content before verification middleware settles
+  if (isPending || !session || session?.user?.role !== "artist") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white font-sans">
+        <p className="text-lg font-semibold tracking-wide animate-pulse text-zinc-400">
+          Verifying structural studio credentials...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white p-8 grid grid-cols-1 lg:grid-cols-12 gap-12 font-sans">
       
-   
+      {/* LEFT COLUMN: PUBLISHING UTILITY MODULE */}
       <div className="lg:col-span-5 space-y-6 bg-zinc-950/50 border border-zinc-900 p-6 rounded-2xl h-fit">
         <div>
-          <h2 className="text-xl font-black">Publish New Composition</h2>
-          <p className="text-zinc-500 text-xs mt-1">Upload files, append prices, and classify category mediums.</p>
+          <h2 className="text-xl font-black tracking-tight text-white">Publish New Composition</h2>
+          <p className="text-zinc-500 text-xs mt-1">Logged in as studio session: <span className="text-zinc-300 font-mono">{artistEmail}</span></p>
         </div>
+        
         <form onSubmit={handleAddArtwork} className="space-y-4">
-          <Input label="Artwork Title" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} variant="bordered" required />
-          <Input label="Acquisition Price ($)" type="number" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} variant="bordered" required />
+          <Input 
+            label="Artwork Title" 
+            value={formData.title} 
+            onChange={(e) => setFormData({...formData, title: e.target.value})} 
+            variant="bordered" 
+            required 
+            className="text-white"
+          />
+          <Input 
+            label="Acquisition Price ($)" 
+            type="number" 
+            value={formData.price} 
+            onChange={(e) => setFormData({...formData, price: e.target.value})} 
+            variant="bordered" 
+            required 
+            className="text-white"
+          />
           
-       
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Artwork Media File</label>
             <div className="border border-dashed border-zinc-800 bg-zinc-900/30 p-4 rounded-xl flex flex-col items-center justify-center text-center relative hover:border-zinc-700 transition-colors">
@@ -127,22 +180,33 @@ export default function ArtistDashboard() {
             </div>
           </div>
 
-          <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-sm text-white focus:outline-none">
+          <select 
+            value={formData.category} 
+            onChange={(e) => setFormData({...formData, category: e.target.value})} 
+            className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-sm text-white focus:outline-none focus:border-zinc-700 transition-colors"
+          >
             <option value="painting">Painting</option>
             <option value="digital">Digital Art</option>
             <option value="sculpture">Sculpture</option>
             <option value="photography">Photography</option>
           </select>
-          <textarea placeholder="Write artist narrative commentary statement specifications..." className="w-full bg-transparent border border-zinc-800 p-3 rounded-xl text-sm h-24 text-white focus:outline-none" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
-          <Button type="submit" disabled={uploading} className="w-full bg-orange-500 font-bold text-white py-6 rounded-xl disabled:opacity-40">
+
+          <textarea 
+            placeholder="Write artist narrative commentary statement specifications..." 
+            className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-sm h-24 text-white focus:outline-none focus:border-zinc-700 transition-colors placeholder:text-zinc-600" 
+            value={formData.description} 
+            onChange={(e) => setFormData({...formData, description: e.target.value})} 
+          />
+
+          <Button type="submit" disabled={uploading} className="w-full bg-orange-500 font-bold text-white py-6 rounded-xl disabled:opacity-40 hover:bg-orange-600 transition-colors">
             Publish Asset
           </Button>
         </form>
       </div>
 
-    
+      {/* RIGHT COLUMN: PORTFOLIO DATA GRID LEDGER */}
       <div className="lg:col-span-7 space-y-6">
-        <h2 className="text-xl font-bold">Your Exhibited Gallery Portfolio</h2>
+        <h2 className="text-xl font-bold tracking-tight">Your Exhibited Gallery Portfolio</h2>
         <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20 backdrop-blur-md">
           <div className="grid grid-cols-12 bg-zinc-900/80 p-4 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
             <div className="col-span-3">Preview</div>
@@ -163,7 +227,12 @@ export default function ArtistDashboard() {
                   <div className="col-span-4 font-bold text-white truncate pr-2">{art.title}</div>
                   <div className="col-span-3 text-orange-400 font-black">${art.price}</div>
                   <div className="col-span-2 text-center">
-                    <button onClick={() => handleDelete(art._id)} className="px-3 py-1.5 bg-red-950/40 hover:bg-red-950 text-red-400 border border-red-900/30 rounded-xl text-xs font-medium transition-colors cursor-pointer">Delete</button>
+                    <button 
+                      onClick={() => handleDelete(art._id)} 
+                      className="px-3 py-1.5 bg-red-950/40 hover:bg-red-950 text-red-400 border border-red-900/30 rounded-xl text-xs font-medium transition-colors cursor-pointer focus:outline-none"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
