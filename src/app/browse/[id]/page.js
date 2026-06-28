@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button, Card, Skeleton } from "@heroui/react";
+
+import { Button, Card, Input } from "@heroui/react"; 
 import { authClient } from "@/lib/auth-client";
+import { toast } from "react-hot-toast";
 
 export default function ArtworkDetailPage() {
   const { id } = useParams();
@@ -13,45 +15,84 @@ export default function ArtworkDetailPage() {
   const { data: session, isPending: sessionLoading } = authClient.useSession();
   
   const [artwork, setArtwork] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [submittingComment, setSubmittingComment] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const viewerEmail = session?.user?.email;
 
-  // Sync artwork details from cluster
-  useEffect(() => {
-    if (id) {
-      setLoading(true);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      
-      fetch(`${apiBaseUrl}/api/artworks/${id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.artwork) {
-            setArtwork(data.artwork);
-          }
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error("Error pulling masterpiece details:", err);
-          setLoading(false);
-        });
+  const fetchArtworkAndComments = async () => {
+    if (!id) return;
+    setLoading(true);
+    // 🌟 FIX: Uniform Environmental Routing API Rule Setup
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      const [artData, comData] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/artworks/${id}`).then(r => r.json()),
+        fetch(`${apiBaseUrl}/api/artworks/${id}/comments`).then(r => r.json())
+      ]);
+
+      if (artData.success) setArtwork(artData.artwork);
+      if (comData.success) setComments(comData.comments);
+    } catch (err) {
+      console.error("Error pulling masterpiece context:", err);
+      toast.error("Failed to sync structural artwork dataset properties.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchArtworkAndComments();
   }, [id]);
 
-  // 🌟 ACTION: STRIPE ARTWORK CHECKOUT ROUTER
+  // 🌟 ACTION: NATIVE COMMENTARY TRANSMISSION PIPELINE
+  const handlePostComment = async (e) => {
+    e.preventDefault();
+    if (!session) return toast.error("Please log into your account to share comments.");
+    if (!commentText.trim()) return;
+
+    setSubmittingComment(true);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/artworks/${id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userName: session.user.name || "Collector",
+          userEmail: viewerEmail,
+          text: commentText
+        })
+      }).then(r => r.json());
+
+      if (res.success) {
+        toast.success("Commentary statement logged!");
+        setCommentText("");
+        // Instantly sync comment directory arrays
+        const update = await fetch(`${apiBaseUrl}/api/artworks/${id}/comments`).then(r => r.json());
+        if (update.success) setComments(update.comments);
+      }
+    } catch (err) {
+      console.error("Comment submission failure:", err);
+      toast.error("Comment delivery handshake refused.");
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // 🌟 ACTION: STRIPE ACQUISITION CHECKOUT GENERATOR
   const handleBuyNow = async () => {
     if (!session) {
-      alert("Please sign in to your account to purchase artworks.");
-      router.push("/login");
-      return;
+      toast.error("Please sign in to your account to purchase artworks.");
+      return router.push("/login");
     }
 
     setPurchasing(true);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      
       const response = await fetch(`${apiBaseUrl}/api/payment/create-artwork-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,40 +106,39 @@ export default function ArtworkDetailPage() {
       const data = await response.json();
       
       if (data.success && data.url) {
-        // Save purchase context so the dashboard can call confirm-purchase after redirect
-        // This is the local dev fallback since Stripe webhooks can't reach localhost
         sessionStorage.setItem("pending_artwork_purchase", JSON.stringify({
           artworkId: id,
           buyerName: session.user.name || "Collector",
         }));
         window.location.href = data.url;
       } else {
-        alert(data.message || "Could not spin up payment portal instance.");
+        toast.error(data.message || "Could not spin up payment portal instance.");
       }
     } catch (err) {
-      console.error("Checkout transaction error:", err);
-      alert("Payment processing network error.");
+      console.error("Checkout link crash:", err);
+      toast.error("Payment routing network handshake failure.");
     } finally {
       setPurchasing(false);
     }
   };
 
-  // 🌟 ACTION: ARTIST INLINE DELETE CONTROLLER
+  // 🌟 ACTION: INLINE ARTIST PURGE REMOVAL CONTROLLER
   const handleDeleteArtwork = async () => {
-    if (!confirm("Are you absolute certain you want to remove this composition?")) return;
+    if (!confirm("Are you absolute certain you want to universally remove this composition?")) return;
     
     setDeleting(true);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       const response = await fetch(`${apiBaseUrl}/api/artworks/${id}`, { method: "DELETE" });
       const data = await response.json();
       
       if (data.success) {
-        alert("Masterpiece removed successfully from marketplace archives.");
+        toast.success("Masterpiece removed successfully from marketplace archives.");
         router.push("/browse");
       }
     } catch (err) {
       console.error("Error purging composition record:", err);
+      toast.error("Universal deletion procedure failed.");
     } finally {
       setDeleting(false);
     }
@@ -132,15 +172,16 @@ export default function ArtworkDetailPage() {
     );
   }
 
-  // 🌟 RELATIONAL COMPARISON VALIDATION ATTRIBUTES
   const isOwner = viewerEmail && artwork.artistEmail === viewerEmail;
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 md:p-12 font-sans">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-start">
+    <div className="min-h-screen bg-black text-white p-6 md:p-12 font-sans max-w-6xl mx-auto space-y-12">
+      
+      {/* UPPER CONTAINER: DETAILS MATRIX */}
+      <div className="flex flex-col md:flex-row gap-12 items-start">
         
-        {/* LEFT CANVAS: VISUAL ASSET LAYOUT */}
-        <div className="w-full md:w-1/2 rounded-3xl overflow-hidden border border-zinc-900 bg-zinc-950/40">
+        {/* LEFT CANVAS LAYOUT */}
+        <div className="w-full md:w-1/2 rounded-3xl overflow-hidden border border-zinc-900 bg-zinc-950">
           <img 
             src={artwork.image || "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800"} 
             alt={artwork.title} 
@@ -148,16 +189,24 @@ export default function ArtworkDetailPage() {
           />
         </div>
 
-        {/* RIGHT CANVAS: METRICS & ACTION HANDLERS */}
+        {/* RIGHT METRICS LOGIC ROW */}
         <div className="w-full md:w-1/2 space-y-6">
           <div className="space-y-1.5">
             <span className="px-2.5 py-0.5 text-xs font-bold bg-orange-500/10 text-orange-400 rounded-md uppercase tracking-wider">
               {artwork.category || "Unclassified"}
             </span>
             <h1 className="text-4xl font-black tracking-tight">{artwork.title}</h1>
+            
+            {/* 🌟 FIX: ARTIST NAME ANCHOR CLICKABLE WITH TARGETED FILTER REDIRECT */}
             <p className="text-sm text-zinc-500">
-              Composed by: <span className="text-zinc-300 font-semibold">{artwork.artistName || "Exhibited Creator"}</span>
-              {isOwner && <span className="ml-2 text-xs text-orange-500 font-mono">(Your Workspace Production)</span>}
+              Composed by:{" "}
+              <span 
+                onClick={() => router.push(`/?artist=${artwork.artistEmail}`)} 
+                className="text-orange-400 font-bold hover:underline cursor-pointer transition-all"
+              >
+                {artwork.artistName || "Exhibited Creator"}
+              </span>
+              {isOwner && <span className="ml-2 text-xs text-orange-500 font-mono">(Your Production)</span>}
             </p>
           </div>
 
@@ -166,7 +215,7 @@ export default function ArtworkDetailPage() {
           <div className="space-y-2">
             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Creator Narrative Commentary</h3>
             <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-line">
-              {artwork.description || "No description statement was supplied for this specific masterwork configuration."}
+              {artwork.description || "No narrative statement supplied for this configuration."}
             </p>
           </div>
 
@@ -183,14 +232,13 @@ export default function ArtworkDetailPage() {
             </div>
           </Card>
 
-          {/* 🌟 ACTION ROUTING BUTTON MATRIX */}
+          {/* PRIVILEGED BUTTON MATRIX */}
           <div className="space-y-3">
             {isOwner ? (
-              /* 🌟 CASE A: USER OWNS THE ARTWORK -> RENDER MANAGEMENT SYSTEM CONTROLS */
               <div className="flex gap-4">
                 <Button 
                   className="flex-1 bg-zinc-900 hover:bg-zinc-800 font-bold text-zinc-300 border border-zinc-800 py-6 rounded-xl transition-colors cursor-pointer"
-                  onClick={() => router.push(`/dashboard/artist`)}
+                  onClick={() => router.push(`/dashboard/artist?edit=${artwork._id}`)}
                 >
                   Edit Studio Asset
                 </Button>
@@ -203,7 +251,6 @@ export default function ArtworkDetailPage() {
                 </Button>
               </div>
             ) : (
-              /* 🌟 CASE B: VISUAL STRIPE ROUTE TRIGGER -> DISABLE IF VIEWER IS THE OWNER */
               <Button
                 onClick={handleBuyNow}
                 disabled={purchasing}
@@ -217,9 +264,42 @@ export default function ArtworkDetailPage() {
               Published on catalog infrastructure: {artwork.createdAt ? new Date(artwork.createdAt).toLocaleDateString() : "N/A"}
             </p>
           </div>
-
         </div>
       </div>
+
+      {/* 🌟 NEW FEATURE: FULL-SPECTRUM COMMENTS CONTEXT ENGINE */}
+      <div className="border-t border-zinc-900 pt-10 space-y-6 max-w-3xl">
+        <h2 className="text-xl font-bold tracking-tight">Community Commentary Discourse ({comments.length})</h2>
+        
+        <form onSubmit={handlePostComment} className="flex gap-3">
+          <Input 
+            placeholder="Share an analytical critique response expression statement..." 
+            value={commentText} 
+            onChange={e => setCommentText(e.target.value)} 
+            variant="bordered" 
+            className="text-white" 
+            required 
+          />
+          <Button type="submit" disabled={submittingComment} className="bg-orange-500 text-white font-bold px-6 rounded-xl">Post</Button>
+        </form>
+
+        <div className="space-y-4 divide-y divide-zinc-900">
+          {comments.length > 0 ? (
+            comments.map((com, index) => (
+              <div key={index} className="pt-4 space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-zinc-300">{com.userName}</span>
+                  <span className="text-zinc-600">{new Date(com.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed">{com.text}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-zinc-600 text-sm italic pt-2">No statements supplied for this canvas piece yet.</p>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 }
