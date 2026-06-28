@@ -7,15 +7,12 @@ import { authClient } from "@/lib/auth-client";
 
 export default function UserDashboard() {
   const router = useRouter();
-  
-  // 🌟 SECURE SESSION LAYER
   const { data: session, isPending } = authClient.useSession();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const userEmail = session?.user?.email;
 
-  // 🌟 ROUTE ACCESS GUARD
   useEffect(() => {
     if (!isPending) {
       if (!session || session?.user?.role !== "user") {
@@ -24,7 +21,6 @@ export default function UserDashboard() {
     }
   }, [session, isPending]);
 
-  // Sync historical purchases
   useEffect(() => {
     if (userEmail) {
       setLoading(true);
@@ -43,19 +39,10 @@ export default function UserDashboard() {
     }
   }, [userEmail]);
 
-  // 🌟 STRIPE CHECKOUT ROUTER ACTION HANDLER
   const handleUpgrade = async (tierName, costAmount) => {
-    console.log(`🚀 Initiating upgrade system for tier: ${tierName}, costing: $${costAmount}`);
-    
-    if (!userEmail) {
-      alert("Session email context missing. Please re-login.");
-      return;
-    }
-
+    if (!userEmail) return;
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      console.log(`🔗 Targeting backend destination gateway: ${apiBaseUrl}`);
-
       const response = await fetch(`${apiBaseUrl}/api/payment/create-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,21 +54,16 @@ export default function UserDashboard() {
       });
 
       const data = await response.json();
-      console.log("📦 Received response payload from backend:", data);
-      
       if (data.success && data.url) {
-        console.log(`🌐 Redirecting out to stripe checkout platform url: ${data.url}`);
         window.location.href = data.url;
       } else {
         alert(data.message || "Could not spin up payment portal instance.");
       }
     } catch (err) {
       console.error("❌ Error running upgrade pipeline session:", err);
-      alert("Payment processing network error.");
     }
   };
 
-  // Intercept layout flashes while tokens evaluate
   if (isPending || !session || session?.user?.role !== "user") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white font-sans">
@@ -95,7 +77,6 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-black text-white p-8 space-y-12 font-sans">
       
-      {/* HEADER SEGMENT */}
       <div>
         <h1 className="text-3xl font-black tracking-tight">User Operations Command</h1>
         <p className="text-zinc-500 text-sm mt-1">
@@ -103,7 +84,7 @@ export default function UserDashboard() {
         </p>
       </div>
 
-      {/* SUBSCRIPTION TIER INTERFACE BLOCKS */}
+      {/* SUBSCRIPTION PLAN MODULES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { title: "Free (Default)", limit: "3 Paintings", cost: "$0", keyName: "free", active: true },
@@ -118,7 +99,6 @@ export default function UserDashboard() {
             <p className="text-2xl font-black mt-4 text-orange-400">{tier.cost}</p>
             <p className="text-zinc-500 text-xs mt-1">Limit Capacity: {tier.limit}</p>
             
-          
             {!tier.active && (
               <Button 
                 size="sm" 
@@ -132,7 +112,7 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      {/* PURCHASE TRANSACTION RECORD MODULE */}
+      {/* 🌟 PURCHASE LOG HISTORY TRANSACTION TABLE */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold">Purchase Log Ledger</h2>
         
@@ -143,11 +123,11 @@ export default function UserDashboard() {
             <div className="col-span-3 text-right">Transaction Timestamp</div>
           </div>
 
-          {loading ? (
-            <div className="p-8 text-center text-zinc-500 text-sm animate-pulse">Syncing user ledger transactions...</div>
-          ) : purchases.length > 0 ? (
-            <div className="divide-y divide-zinc-900">
-              {purchases.map((tx, idx) => (
+          <div className="divide-y divide-zinc-900">
+            {loading ? (
+              <div className="p-8 text-center text-zinc-500 text-sm animate-pulse">Syncing user ledger transactions...</div>
+            ) : purchases.length > 0 ? (
+              purchases.map((tx, idx) => (
                 <div key={idx} className="grid grid-cols-12 p-4 items-center text-sm hover:bg-zinc-900/30 transition-colors">
                   <div className="col-span-6 font-semibold text-white truncate pr-2">{tx.artworkTitle}</div>
                   <div className="col-span-3 text-orange-400 font-bold">${tx.amount}</div>
@@ -155,11 +135,11 @@ export default function UserDashboard() {
                     {tx.date ? new Date(tx.date).toLocaleDateString() : "N/A"}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-12 text-center text-zinc-500 text-sm">No acquired masterpieces found in your collection history log.</div>
-          )}
+              ))
+            ) : (
+              <div className="p-12 text-center text-zinc-500 text-sm">No acquired masterpieces found in your collection history log.</div>
+            )}
+          </div>
         </div>
       </div>
 

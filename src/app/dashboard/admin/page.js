@@ -6,18 +6,22 @@ import { Button } from "@heroui/react";
 export default function AdminDashboardPage() {
   const [analytics, setAnalytics] = useState(null);
   const [users, setUsers] = useState([]);
+  const [transactions, setTransactions] = useState([]); // 🌟 Added Platform Ledger State
   const [loading, setLoading] = useState(true);
 
   const fetchAdminData = () => {
     setLoading(true);
-   
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    
     Promise.all([
-      fetch("http://localhost:5000/api/admin/analytics").then((res) => res.json()),
-      fetch("http://localhost:5000/api/admin/users").then((res) => res.json())
+      fetch(`${apiBaseUrl}/api/admin/analytics`).then((res) => res.json()),
+      fetch(`${apiBaseUrl}/api/admin/users`).then((res) => res.json()),
+      fetch(`${apiBaseUrl}/api/admin/transactions`).then((res) => res.json()) // 🌟 Fetch system entries
     ])
-      .then(([analyticsData, usersData]) => {
+      .then(([analyticsData, usersData, transactionsData]) => {
         if (analyticsData.success) setAnalytics(analyticsData);
         if (usersData.success) setUsers(usersData.users);
+        if (transactionsData.success) setTransactions(transactionsData.transactions);
         setLoading(false);
       })
       .catch((err) => {
@@ -31,7 +35,8 @@ export default function AdminDashboardPage() {
   }, []);
 
   const changeRole = (userId, targetRole) => {
-    fetch(`http://localhost:5000/api/admin/users/${userId}/role`, {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    fetch(`${apiBaseUrl}/api/admin/users/${userId}/role`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: targetRole })
@@ -58,13 +63,12 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-10 space-y-12 font-sans">
       
-   
       <div>
         <h1 className="text-3xl font-black tracking-tight">System Administrative Hub</h1>
         <p className="text-zinc-500 text-sm mt-1">Platform metric analytics telemetry monitoring and global access controls.</p>
       </div>
 
-   
+      {/* METRICS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { title: "Verified Buyers", metric: analytics?.analytics?.totalUsers, color: "border-blue-500/20 text-blue-400" },
@@ -79,7 +83,7 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-
+      {/* DENSITY AGGREGATION BLOCK */}
       <div className="bg-zinc-900/10 border border-zinc-900 p-6 rounded-2xl space-y-6">
         <div>
           <h2 className="text-lg font-bold">Category Density Chart Overview</h2>
@@ -108,6 +112,54 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* 🌟 NEW SEGMENT: SYSTEM-WIDE TRANSACTION RECORD LEDGER */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold">Global Platform Financial Ledger</h2>
+          <p className="text-zinc-500 text-xs mt-0.5">Audit track all subscription tier memberships and masterpiece acquisitions across the cluster.</p>
+        </div>
+
+        <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20">
+          <div className="grid grid-cols-12 bg-zinc-900/80 p-4 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
+            <div className="col-span-3">Event Type</div>
+            <div className="col-span-4">Account Context</div>
+            <div className="col-span-2">Amount (USD)</div>
+            <div className="col-span-3 text-right">Timestamp</div>
+          </div>
+
+          <div className="divide-y divide-zinc-900">
+            {transactions.length > 0 ? (
+              transactions.map((tx, idx) => {
+                const isItemPurchase = tx.type === "purchase" || tx.artworkTitle;
+                return (
+                  <div key={idx} className="grid grid-cols-12 p-4 items-center text-sm hover:bg-zinc-900/30 transition-colors">
+                    <div className="col-span-3">
+                      <span className={`px-2 py-0.5 text-xs font-bold rounded-md ${
+                        isItemPurchase ? "bg-emerald-500/10 text-emerald-400" : "bg-orange-500/10 text-orange-400"
+                      }`}>
+                        {isItemPurchase ? "Masterpiece Purchase" : "Plan Upgrade"}
+                      </span>
+                    </div>
+                    <div className="col-span-4 text-zinc-300 truncate pr-2">
+                      {isItemPurchase ? `${tx.buyerName} ➔ ${tx.artworkTitle}` : tx.userEmail}
+                    </div>
+                    <div className="col-span-2 font-black text-orange-400">
+                      ${tx.amount}
+                    </div>
+                    <div className="col-span-3 text-zinc-500 text-xs text-right">
+                      {tx.date ? new Date(tx.date).toLocaleString() : "N/A"}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-zinc-600 text-sm">No historical platform revenue actions logged.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ACCOUNT MANAGER REGISTRY */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold">User System Account Registry</h2>
@@ -115,7 +167,6 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20">
-      
           <div className="grid grid-cols-12 bg-zinc-900/80 p-4 text-xs font-bold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
             <div className="col-span-3">Profile Name</div>
             <div className="col-span-4">Email Address</div>
@@ -123,7 +174,6 @@ export default function AdminDashboardPage() {
             <div className="col-span-3 text-center">Reassign Role Privilege Matrix Actions</div>
           </div>
 
-         
           <div className="divide-y divide-zinc-900">
             {users.map((usr) => (
               <div key={usr._id} className="grid grid-cols-12 p-4 items-center text-sm hover:bg-zinc-900/30 transition-colors">
