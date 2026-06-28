@@ -67,7 +67,8 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/",
+        // 🌟 FIX: Force Google to bring the authenticated user back to the frontend app, not the backend API!
+        callbackURL: "http://localhost:3000/dashboard/user",
       });
     } catch (err) {
       setError("Google authentication could not be initiated.");

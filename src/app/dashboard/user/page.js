@@ -8,14 +8,14 @@ import { authClient } from "@/lib/auth-client";
 export default function UserDashboard() {
   const router = useRouter();
   
-  // 🌟 SECURE SESSION LAYER: Hydrate session context and remove hardcoded user mock pointers
+  // 🌟 SECURE SESSION LAYER
   const { data: session, isPending } = authClient.useSession();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const userEmail = session?.user?.email;
 
-  // 🌟 SECURITY ROLE GUARD: Defend buyer route against unauthenticated access
+  // 🌟 ROUTE ACCESS GUARD
   useEffect(() => {
     if (!isPending) {
       if (!session || session?.user?.role !== "user") {
@@ -24,7 +24,7 @@ export default function UserDashboard() {
     }
   }, [session, isPending]);
 
-  // Sync historical buyer purchase streams cleanly using dynamic context endpoints
+  // Sync historical purchases
   useEffect(() => {
     if (userEmail) {
       setLoading(true);
@@ -43,7 +43,45 @@ export default function UserDashboard() {
     }
   }, [userEmail]);
 
-  // Intercept layout flashes while security tokens evaluate
+  // 🌟 STRIPE CHECKOUT ROUTER ACTION HANDLER
+  const handleUpgrade = async (tierName, costAmount) => {
+    console.log(`🚀 Initiating upgrade system for tier: ${tierName}, costing: $${costAmount}`);
+    
+    if (!userEmail) {
+      alert("Session email context missing. Please re-login.");
+      return;
+    }
+
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      console.log(`🔗 Targeting backend destination gateway: ${apiBaseUrl}`);
+
+      const response = await fetch(`${apiBaseUrl}/api/payment/create-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          tier: tierName,
+          priceAmount: costAmount
+        })
+      });
+
+      const data = await response.json();
+      console.log("📦 Received response payload from backend:", data);
+      
+      if (data.success && data.url) {
+        console.log(`🌐 Redirecting out to stripe checkout platform url: ${data.url}`);
+        window.location.href = data.url;
+      } else {
+        alert(data.message || "Could not spin up payment portal instance.");
+      }
+    } catch (err) {
+      console.error("❌ Error running upgrade pipeline session:", err);
+      alert("Payment processing network error.");
+    }
+  };
+
+  // Intercept layout flashes while tokens evaluate
   if (isPending || !session || session?.user?.role !== "user") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white font-sans">
@@ -68,9 +106,9 @@ export default function UserDashboard() {
       {/* SUBSCRIPTION TIER INTERFACE BLOCKS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { title: "Free (Default)", limit: "3 Paintings", cost: "$0", active: true },
-          { title: "Pro Upgrade", limit: "9 Paintings", cost: "$9.99/mo", active: false },
-          { title: "Premium VIP", limit: "Unlimited Paintings", cost: "$19.99/mo", active: false },
+          { title: "Free (Default)", limit: "3 Paintings", cost: "$0", keyName: "free", active: true },
+          { title: "Pro Upgrade", limit: "9 Paintings", cost: "$9.99/mo", keyName: "pro", active: false },
+          { title: "Premium VIP", limit: "Unlimited Paintings", cost: "$19.99/mo", keyName: "premium", active: false },
         ].map((tier, i) => (
           <div key={i} className={`p-6 rounded-2xl border ${tier.active ? "border-orange-500 bg-orange-500/5" : "border-zinc-800 bg-zinc-900/20"}`}>
             <div className="flex justify-between items-center">
@@ -79,7 +117,17 @@ export default function UserDashboard() {
             </div>
             <p className="text-2xl font-black mt-4 text-orange-400">{tier.cost}</p>
             <p className="text-zinc-500 text-xs mt-1">Limit Capacity: {tier.limit}</p>
-            {!tier.active && <Button size="sm" className="w-full mt-4 bg-zinc-800 text-white rounded-xl">Upgrade via Stripe</Button>}
+            
+          
+            {!tier.active && (
+              <Button 
+                size="sm" 
+                onClick={() => handleUpgrade(tier.keyName, tier.keyName === "pro" ? 9.99 : 19.99)}
+                className="w-full mt-4 bg-orange-500 hover:bg-orange-600 font-bold text-white rounded-xl transition-colors cursor-pointer"
+              >
+                Upgrade via Stripe
+              </Button>
+            )}
           </div>
         ))}
       </div>
