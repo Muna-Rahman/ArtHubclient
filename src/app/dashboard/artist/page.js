@@ -262,6 +262,59 @@ export default function ArtistDashboard() {
           </div>
         </div>
       </div>
+      {/* 🌟 INTEGRATED PROFILE IDENTITY UTILITY FOR ARTISTS */}
+      <div className="space-y-4 border-t border-zinc-900 pt-10 lg:col-span-12">
+        <div>
+          <h2 className="text-xl font-bold">Studio Identity Settings</h2>
+          <p className="text-zinc-500 text-xs mt-0.5">Modify public creator display properties and security authentication access credentials.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
+          {/* Adjust Artist Username Form */}
+          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Update Creator Name</h3>
+            <Input 
+              label="Public Exhibition Pen Name" 
+              placeholder={artistName}
+              variant="bordered" 
+              id="artistUpdateNameField"
+            />
+            <Button 
+              size="sm" 
+              className="bg-orange-500 font-bold text-white rounded-lg cursor-pointer"
+              onClick={async () => {
+                const val = document.getElementById("artistUpdateNameField").value;
+                if(!val) return alert("Please specify a string name.");
+                await authClient.user.updateName({ name: val });
+                alert("Studio profile altered successfully!");
+                window.location.reload();
+              }}
+            >
+              Update Creator Name
+            </Button>
+          </div>
+
+          {/* Adjust Artist Password Form */}
+          <div className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Modify Studio Security Password</h3>
+            <Input label="Current Password" type="password" variant="bordered" id="artCurPass" />
+            <Input label="New Secure Password" type="password" variant="bordered" id="artNewPass" />
+            <Button 
+              size="sm" 
+              className="bg-zinc-900 border border-zinc-800 font-bold text-white rounded-lg cursor-pointer"
+              onClick={async () => {
+                const c = document.getElementById("artCurPass").value;
+                const n = document.getElementById("artNewPass").value;
+                const { error } = await authClient.changePassword({ currentPassword: c, newPassword: n });
+                if(error) alert(error.message);
+                else alert("Security credentials adjusted successfully!");
+              }}
+            >
+              Modify Password
+            </Button>
+          </div>
+        </div>
+      </div>
 
     </div>
   );
