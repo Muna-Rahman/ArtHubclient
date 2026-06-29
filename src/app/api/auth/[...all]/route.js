@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 export async function proxyHandler(req) {
   const { pathname, search } = new URL(req.url);
-  const subPath = pathname.replace(/^\/api\/auth/, "");
   
+  const subPath = pathname.replace(/^\/api\/auth/, "");
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || "https://arthub-server-ten.vercel.app";
   const targetUrl = `${backendBaseUrl}/api/auth${subPath}${search}`;
 
@@ -18,16 +18,31 @@ export async function proxyHandler(req) {
       redirect: "manual",
     });
 
-    // Extract headers and specifically map cookies
-    const newHeaders = new Headers(response.headers);
+    // 💡 FIX: Safely parse and separate multi-value headers
+    const newHeaders = new Headers();
+    
+    // Copy over all standard headers except set-cookie
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== "set-cookie") {
+        newHeaders.set(key, value);
+      }
+    });
+
+    // Extract each cookie individually so they don't combine into one broken string
+    if (response.headers.getSetCookie) {
+      const cookies = response.headers.getSetCookie();
+      cookies.forEach((cookie) => {
+        newHeaders.append("set-cookie", cookie);
+      });
+    }
 
     return new NextResponse(response.body, {
       status: response.status,
       headers: newHeaders,
     });
   } catch (error) {
-    console.error("❌ Next.js Authentication Proxy Failed:", error);
-    return NextResponse.json({ success: false, message: "Proxy Connection Error" }, { status: 500 });
+    console.error("❌ Next.js Cross-Domain Proxy Gateway Failure:", error);
+    return NextResponse.json({ success: false, message: "Proxy Connection Exception" }, { status: 500 });
   }
 }
 

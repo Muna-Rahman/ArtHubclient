@@ -51,14 +51,16 @@ export default function LoginPage() {
     }
   };
 
-  // ✅ ONLY ONE definition here now, routing callbacks straight to the homepage
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/` : "http://localhost:3000/",
+        //  Force Google to bring the authenticated user back to the frontend production app or local fallback!
+        callbackURL: process.env.NEXT_PUBLIC_APP_URL 
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/` 
+          : "http://localhost:3000/",
       });
     } catch (err) {
       setError("Google authentication could not be initiated.");
