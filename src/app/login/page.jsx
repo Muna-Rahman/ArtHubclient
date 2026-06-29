@@ -24,7 +24,6 @@ export default function LoginPage() {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  // 🌟 FIXED CREDENTIALS FLOW: Correctly requests session details to verify target dashboards
   const handleCredentialsLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -42,18 +41,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Fetch full active database session context to read custom properties accurately
-      const sessionRes = await authClient.getSession();
-      const userRole = sessionRes?.data?.user?.role || "user";
-
-      // Secure dynamic routing block based on evaluated database role strings
-      if (userRole === "admin") {
-        window.location.href = "/dashboard/admin";
-      } else if (userRole === "artist") {
-        window.location.href = "/dashboard/artist";
-      } else {
-        window.location.href = "/dashboard/user";
-      }
+      // Send user directly to the homepage first
+      window.location.href = "/";
+      
     } catch (err) {
       setError("An unexpected authentication error occurred.");
     } finally {
@@ -61,14 +51,14 @@ export default function LoginPage() {
     }
   };
 
+  // ✅ ONLY ONE definition here now, routing callbacks straight to the homepage
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
     try {
       await authClient.signIn.social({
         provider: "google",
-        // 🌟 FIX: Force Google to bring the authenticated user back to the frontend app, not the backend API!
-        callbackURL: "http://localhost:3000/dashboard/user",
+        callbackURL: process.env.NEXT_PUBLIC_APP_URL ? `${process.env.NEXT_PUBLIC_APP_URL}/` : "http://localhost:3000/",
       });
     } catch (err) {
       setError("Google authentication could not be initiated.");
