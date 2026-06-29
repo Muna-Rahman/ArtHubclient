@@ -6,7 +6,7 @@ import { Button, Input, Card } from "@heroui/react";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "react-hot-toast";
 
-function UserDashboard() {
+function UserDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
@@ -24,6 +24,7 @@ function UserDashboard() {
   const userName = session?.user?.name || "Collector";
   const activeTier = liveSubscriptionTier || "free";
 
+  // Security route guard validation context
   useEffect(() => {
     if (!isPending) {
       if (!session || session?.user?.role !== "user") {
@@ -34,90 +35,119 @@ function UserDashboard() {
     }
   }, [session, isPending]);
 
-  // 🌟 BULLETPROOF DIRECT REDIRECT HANDLER (READS URL PARAMS TO FORCE DB SAVANCE)
-  useEffect(() => {
-    const paymentSuccess = searchParams.get("payment_success");
-    const purchaseSuccess = searchParams.get("purchase_success");
-    const urlTier = searchParams.get("tier");
-    const urlArtworkId = searchParams.get("artworkId");
-    const urlBuyerName = searchParams.get("buyerName");
+  // Unified asynchronous data fetch engine to handle single state updates safely
+  const loadFreshDatabaseContent = async (email) => {
+    if (!email) return;
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const cacheBuster = `?email=${encodeURIComponent(email)}&t=${Date.now()}`;
 
-    // Fallback 1: Force Subscription Upgrade Database Writes
-    if (paymentSuccess === "true" && userEmail) {
-      const targetTier = urlTier || "pro";
-
-      fetch(`${apiBaseUrl}/api/payment/confirm-subscription`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail, tier: targetTier }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            setLiveSubscriptionTier(data.tier);
-            toast.success(`Upgraded to ${data.tier.toUpperCase()} successfully!`);
-          }
-          router.replace("/dashboard/user");
-        })
-        .catch(() => router.replace("/dashboard/user"));
-    }
-
-    // Fallback 2: Force Artwork Purchase Database Writes (No longer requires empty sessionStorage)
-    if (purchaseSuccess === "true" && userEmail && urlArtworkId) {
-      fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          buyerEmail: userEmail, 
-          buyerName: decodeURIComponent(urlBuyerName || "Collector"), 
-          artworkId: urlArtworkId 
-        }),
-      })
-        .then((res) => res.json())
-        .then(() => {
-          toast.success("Artwork purchase logged into database!");
-          // Instantly re-fetch purchase logs to populate dashboard view items
-          return fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`);
-        })
-        .then((r) => r.json())
-        .then((d) => { if (d.success) setPurchases(d.history || []); })
-        .catch((err) => console.error("Error confirming fallback checkout:", err))
-        .finally(() => router.replace("/dashboard/user"));
-    }
-  }, [searchParams, userEmail, router]);
-
-  // Fetch live user status tier details on dashboard mount
-  useEffect(() => {
-    if (userEmail) {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      fetch(`${apiBaseUrl}/api/user/profile?email=${encodeURIComponent(userEmail)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.user?.subscriptionTier) {
-            setLiveSubscriptionTier(data.user.subscriptionTier);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [userEmail]);
-
-  // Fetch historical purchase log array
-  useEffect(() => {
-    if (!userEmail) return;
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    setLoading(true);
-
-    fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.history) {
-          setPurchases(data.history);
+    try {
+      // 1. Synchronize Live Subscription Rank Profile state
+      const profileRes = await fetch(`${apiBaseUrl}/api/user/profile${cacheBuster}`);
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        if (profileData.success && profileData.user?.subscriptionTier) {
+          setLiveSubscriptionTier(profileData.user.subscriptionTier);
         }
-      })
-      .catch((err) => console.error("Error fetching purchases:", err))
-      .finally(() => setLoading(false));
-  }, [userEmail]);
+      }
+
+      // 2. Synchronize Purchase Ledger History records
+      const purchasesRes = await fetch(`${apiBaseUrl}/api/user/purchases${cacheBuster}`);
+      if (purchasesRes.ok) {
+        const purchasesData = await purchasesRes.json();
+        if (purchasesData.success && purchasesData.history) {
+          setPurchases(purchasesData.history);
+        }
+      }
+    } catch (err) {
+      console.error("Error syncing fresh database states:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 💳 BULLETPROOF STRIPE CHECKOUT REDIRECT & FALLBACK TRANSACTION PROCESSING
+  useEffect(() => {
+    const processRedirectParameters = async () => {
+      if (!userEmail) return;
+
+      const paymentSuccess = searchParams.get("payment_success");
+      const purchaseSuccess = searchParams.get("purchase_success");
+      const urlTier = searchParams.get("tier");
+      const urlArtworkId = searchParams.get("artworkId");
+      const urlBuyerName = searchParams.get("buyerName");
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+      let structuralStateChanged = false;
+
+      // Handle Subscription Upgrades Fallback Pipeline Sequential Execution
+      if (paymentSuccess === "true") {
+        setLoading(true);
+        try {
+          const targetTier = urlTier || "pro";
+          const res = await fetch(`${apiBaseUrl}/api/payment/confirm-subscription`, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ email: userEmail, tier: targetTier }),
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              toast.success(`Upgraded to ${targetTier.toUpperCase()} successfully!`);
+              structuralStateChanged = true;
+            }
+          } else {
+            console.error("Server responded with a status error code:", res.status);
+          }
+        } catch (err) {
+          console.error("Subscription conversion error:", err);
+        }
+      }
+
+      // Handle Artwork Purchases Fallback Pipeline Sequential Execution
+      if (purchaseSuccess === "true" && urlArtworkId) {
+        setLoading(true);
+        try {
+          const res = await fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ 
+              buyerEmail: userEmail, 
+              buyerName: decodeURIComponent(urlBuyerName || "Collector"), 
+              artworkId: urlArtworkId 
+            }),
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              toast.success("Artwork purchase successfully logged!");
+              structuralStateChanged = true;
+            }
+          }
+        } catch (err) {
+          console.error("Artwork ledger write error:", err);
+        }
+      }
+
+      // Trigger clean data sync re-fetch
+      if (structuralStateChanged) {
+        await loadFreshDatabaseContent(userEmail);
+        router.replace("/dashboard/user");
+      } else {
+        loadFreshDatabaseContent(userEmail);
+      }
+    };
+
+    processRedirectParameters();
+  }, [searchParams, userEmail, router]);
 
   const handleUpgrade = async (tierName, costAmount) => {
     if (!userEmail) return;
@@ -170,7 +200,6 @@ function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-10 space-y-14 font-sans">
-      
       <div>
         <h1 className="text-3xl font-black tracking-tight">User Operations Command</h1>
         <p className="text-zinc-500 text-sm mt-1">
@@ -211,7 +240,7 @@ function UserDashboard() {
         })}
       </div>
 
-      {/* THUMBNAILS MATRIX GALLERY */}
+      {/* GALLERY MATRIX */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Your Acquired Masterpiece Collection Gallery</h2>
@@ -245,7 +274,7 @@ function UserDashboard() {
         )}
       </div>
 
-      {/* TABLE DATA LIST LEDGER */}
+      {/* TABLE LOG LEDGER */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold">Purchase Log Ledger</h2>
         <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20 backdrop-blur-md">
@@ -298,7 +327,6 @@ function UserDashboard() {
           </form>
         </div>
       </div>
-
     </div>
   );
 }
@@ -310,7 +338,7 @@ export default function UserDashboardPage() {
         <p className="animate-pulse">Loading dashboard...</p>
       </div>
     }>
-      <UserDashboard />
+      <UserDashboardContent />
     </Suspense>
   );
 }

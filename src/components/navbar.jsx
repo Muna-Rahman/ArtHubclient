@@ -10,23 +10,22 @@ export default function Navbar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-  const [liveRole, setLiveRole] = useState("user"); // 🌟 Track real database role state
+  const [liveRole, setLiveRole] = useState("user"); 
   const dropdownRef = useRef(null);
 
   const { data: session } = authClient.useSession();
   const isAuthenticated = !!session;
 
-
   useEffect(() => {
     if (isAuthenticated && session?.user?.email) {
-      fetch(`http://localhost:5000/api/admin/users`)
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      
+      // 🌟 SECURE ROLE RESOLUTION: Targeted query instead of loading all platform user data arrays
+      fetch(`${apiBaseUrl}/api/user/profile?email=${encodeURIComponent(session.user.email)}`)
         .then((res) => res.json())
         .then((data) => {
-          if (data.success && data.users) {
-            const currentUser = data.users.find(u => u.email === session.user.email);
-            if (currentUser && currentUser.role) {
-              setLiveRole(currentUser.role);
-            }
+          if (data.success && data.user?.role) {
+            setLiveRole(data.user.role);
           }
         })
         .catch((err) => console.error("Failed syncing live user role validation:", err));
@@ -62,7 +61,6 @@ export default function Navbar() {
       ? "block rounded-lg pl-8 pr-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white"
       : "block rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors";
 
-   
     if (liveRole === "admin") {
       return (
         <Link href="/dashboard/admin" className={baseStyle} onClick={() => { setIsMenuOpen(false); setIsDashboardOpen(false); }}>
@@ -157,7 +155,6 @@ export default function Navbar() {
         </div>
       </div>
 
-     
       {isMenuOpen && (
         <div className="border-t border-zinc-800 bg-black md:hidden">
           <ul className="space-y-1 px-2 py-3">

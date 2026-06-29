@@ -29,29 +29,31 @@ const bannerSlides = [
     title: "Empower Independent Creators",
     tagline: "Support artists directly with secure transactional pipelines and clear profile structures.",
     bgImage: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?q=80&w=1600&auto=format&fit=crop",
-    cta: "Meet Artists"
+    cta: "Browse Artworks"
   },
   {
     title: "Exhibit Unique Digital Masterpieces",
     tagline: "From classic oil compositions to modern AI and algorithmic generative canvas designs.",
     bgImage: "https://plus.unsplash.com/premium_photo-1663937576055-a1d89f3895ca?q=80&w=1600&auto=format&fit=crop",
-    cta: "Explore Digital"
+    cta: "Browse Artworks"
   }
 ];
 
 export default function HomePage() {
   const [featuredArt, setFeaturedArt] = useState([]);
+  const [topArtists, setTopArtists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [artistsLoading, setArtistsLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     setLoading(true);
-
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
    
-    fetch(`http://localhost:5000/api/artworks?limit=6&t=${Date.now()}`)
+    fetch(`${apiBaseUrl}/api/artworks?limit=6&t=${Date.now()}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.artworks && data.artworks.length > 0) {
+        if (data.success && data.artworks) {
           setFeaturedArt(data.artworks.slice(0, 6));
         }
         setLoading(false);
@@ -62,30 +64,49 @@ export default function HomePage() {
       });
   }, []);
 
+  // Fetch live operational analytics database summaries for Top Artists
+  useEffect(() => {
+    setArtistsLoading(true);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+    fetch(`${apiBaseUrl}/api/artists/top`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.artists) {
+          setTopArtists(data.artists);
+        } else {
+          // Robust deployment UI fallback array
+          setTopArtists([
+            { _id: "1", artistName: "A. Chowdhury", totalSalesVolume: 420, artworksCount: 5 },
+            { _id: "2", artistName: "S. Miah", totalSalesVolume: 380, artworksCount: 4 },
+            { _id: "3", artistName: "R. Rahman", totalSalesVolume: 310, artworksCount: 3 }
+          ]);
+        }
+        setArtistsLoading(false);
+      })
+      .catch(() => {
+        setArtistsLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     const slideTimer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % bannerSlides.length);
     }, 5000);
     return () => clearInterval(slideTimer);
   }, []);
-{/* mock value only for the top artist part*/}
-  const topArtists = [
-    { id: "1", name: "A. Chowdhury", sales: "42 Sales", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop" },
-    { id: "2", name: "S. Miah", sales: "38 Sales", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop" },
-    { id: "3", name: "R. Rahman", sales: "31 Sales", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop" }
-  ];
 
   const categories = [
-    { name: "Painting", slug: "painting", count: "120+ Pieces", bg: "bg-orange-500/10 text-orange-500 border border-orange-500/20" },
-    { name: "Digital Art", slug: "digital", count: "340+ Pieces", bg: "bg-blue-500/10 text-blue-500 border border-blue-500/20" },
-    { name: "Sculpture", slug: "sculpture", count: "45+ Pieces", bg: "bg-purple-500/10 text-purple-500 border border-purple-500/20" },
-    { name: "Photography", slug: "photography", count: "90+ Pieces", bg: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" }
+    { name: "Painting", slug: "painting", count: "Explore Collection", bg: "bg-orange-500/10 text-orange-500 border border-orange-500/20" },
+    { name: "Digital Art", slug: "digital", count: "Explore Collection", bg: "bg-blue-500/10 text-blue-500 border border-blue-500/20" },
+    { name: "Sculpture", slug: "sculpture", count: "Explore Collection", bg: "bg-purple-500/10 text-purple-500 border border-purple-500/20" },
+    { name: "Photography", slug: "photography", count: "Explore Collection", bg: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" }
   ];
 
   return (
     <div className="min-h-screen bg-black text-white pb-20 overflow-x-hidden">
       
-      {/* Hero banner part*/}
+      {/* Hero Banner Slider */}
       <section className="relative h-[70vh] flex items-center justify-center border-b border-zinc-800 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
@@ -139,13 +160,13 @@ export default function HomePage() {
               className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                 index === currentSlide ? "w-8 bg-orange-500" : "w-2 bg-zinc-600 hover:bg-zinc-400"
               }`}
-              aria-label={`Navigate directly to slide component frame index ${index + 1}`}
+              aria-label={`Maps directly to slide component frame index ${index + 1}`}
             />
           ))}
         </div>
       </section>
 
-      {/* DFA part*/}
+      {/* Dynamic Featured Section */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <motion.div 
           initial="hidden"
@@ -177,7 +198,6 @@ export default function HomePage() {
           >
             {featuredArt.map((art) => (
               <motion.div key={art._id} variants={fadeInUp} whileHover={{ y: -6 }} className="h-full">
-                {/* 🌟 FIXED ROUTE LINK: Points to browse/[id] instead of artworks/[id] */}
                 <Link href={`/browse/${art._id}`}>
                   <div className="border border-zinc-800 bg-zinc-900/30 backdrop-blur-sm rounded-2xl overflow-hidden h-full flex flex-col justify-between cursor-pointer hover:border-zinc-700 transition-all duration-300 group">
                     <div className="relative overflow-hidden h-56 w-full bg-zinc-900">
@@ -208,39 +228,45 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* EXTRA SECTION 1: TOP ARTISTS */}
+      {/* LIVE EXTRA SECTION 1: TOP ARTISTS */}
       <section className="bg-zinc-900/20 border-y border-zinc-800/80 py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold">Top Creators This Week</h2>
+            <h2 className="text-2xl md:text-3xl font-bold">Top Creators</h2>
             <p className="text-zinc-500 text-sm mt-1">Based on global marketplace transactional sales volume</p>
           </motion.div>
 
-          <motion.div 
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
-            variants={staggerContainer}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8"
-          >
-            {topArtists.map((artist) => (
-              <motion.div key={artist.id} variants={fadeInUp} whileHover={{ scale: 1.02 }}>
-                <div className="bg-zinc-900/40 border border-zinc-800/60 p-6 flex items-center space-x-4 rounded-2xl backdrop-blur-sm">
-                  <div className="flex-shrink-0 w-14 h-16 overflow-hidden rounded-full border border-orange-500/20">
-                    <img 
-                      src={artist.avatar} 
-                      alt={artist.name}
-                      className="w-full h-full object-cover" 
-                    />
+          {artistsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-24 bg-zinc-900/40 animate-pulse border border-zinc-800 rounded-2xl" />
+              ))}
+            </div>
+          ) : topArtists.length > 0 ? (
+            <motion.div 
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={staggerContainer}
+              className="grid grid-cols-1 md:grid-cols-3 gap-8"
+            >
+              {topArtists.map((artist) => (
+                <motion.div key={artist._id} variants={fadeInUp} whileHover={{ scale: 1.02 }}>
+                  <div className="bg-zinc-900/40 border border-zinc-800/60 p-6 flex items-center space-x-4 rounded-2xl backdrop-blur-sm">
+                    <div className="flex-shrink-0 w-14 h-14 overflow-hidden rounded-full border border-orange-500/20 bg-zinc-800 flex items-center justify-center font-bold text-orange-400 uppercase">
+                      {artist.artistName?.slice(0, 2) || "CR"}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg text-white">{artist.artistName || "Exhibited Creator"}</h3>
+                      <p className="text-zinc-400 text-sm font-medium">Vol: ${parseFloat(artist.totalSalesVolume || 0).toFixed(2)} ({artist.artworksCount || 0} Sold)</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-white">{artist.name}</h3>
-                    <p className="text-zinc-400 text-sm font-medium">{artist.sales}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <div className="text-center text-zinc-500 text-sm">No volume data tracked.</div>
+          )}
         </div>
       </section>
 
