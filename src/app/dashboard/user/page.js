@@ -15,17 +15,13 @@ function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [liveSubscriptionTier, setLiveSubscriptionTier] = useState(null);
 
-  // PROFILE MANAGEMENT STATE MANAGEMENT
   const [newName, setNewName] = useState("");
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "" });
-  const [profileMessage, setProfileMessage] = useState({ success: "", error: "" });
   const [updatingName, setUpdatingName] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const userEmail = session?.user?.email;
   const userName = session?.user?.name || "Collector";
-  
-  // Use liveSubscriptionTier fetched from DB — session does NOT carry subscriptionTier
   const activeTier = liveSubscriptionTier || "free";
 
   useEffect(() => {
@@ -38,62 +34,60 @@ function UserDashboard() {
     }
   }, [session, isPending]);
 
-  // 🌟 FIX 1: FALLBACK REDIRECT LOGIC FOR LOCAL TESTING (HANDLES WEBHOOK GAPS)
+  // 🌟 BULLETPROOF DIRECT REDIRECT HANDLER (READS URL PARAMS TO FORCE DB SAVANCE)
   useEffect(() => {
     const paymentSuccess = searchParams.get("payment_success");
     const purchaseSuccess = searchParams.get("purchase_success");
+    const urlTier = searchParams.get("tier");
+    const urlArtworkId = searchParams.get("artworkId");
+    const urlBuyerName = searchParams.get("buyerName");
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-    // Case A: Subscription Upgrade Fallback
+    // Fallback 1: Force Subscription Upgrade Database Writes
     if (paymentSuccess === "true" && userEmail) {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      
-      fetch(`${apiBaseUrl}/api/user/profile?email=${encodeURIComponent(userEmail)}`)
+      const targetTier = urlTier || "pro";
+
+      fetch(`${apiBaseUrl}/api/payment/confirm-subscription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail, tier: targetTier }),
+      })
         .then((res) => res.json())
         .then((data) => {
-          if (data.success && data.user?.subscriptionTier) {
-            setLiveSubscriptionTier(data.user.subscriptionTier);
-            toast.success(`Account plan upgraded! Rank: ${data.user.subscriptionTier.toUpperCase()}`);
+          if (data.success) {
+            setLiveSubscriptionTier(data.tier);
+            toast.success(`Upgraded to ${data.tier.toUpperCase()} successfully!`);
           }
           router.replace("/dashboard/user");
         })
         .catch(() => router.replace("/dashboard/user"));
     }
 
-    // Case B: Artwork Purchase Fallback
-    if (purchaseSuccess === "true" && userEmail) {
-      const pending = sessionStorage.getItem("pending_artwork_purchase");
-      if (pending) {
-        try {
-          const { artworkId, buyerName } = JSON.parse(pending);
-          const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-          
-          fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ buyerEmail: userEmail, buyerName, artworkId }),
-          })
-            .then((res) => res.json())
-            .then((resData) => {
-              sessionStorage.removeItem("pending_artwork_purchase");
-              toast.success("Artwork purchase successfully logged!");
-              
-              // 🌟 Re-fetch purchases list immediately so tables populate on fallback redirect
-              return fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`);
-            })
-            .then((r) => r.json())
-            .then((d) => {
-              if (d.success && d.history) setPurchases(d.history);
-            })
-            .catch(() => sessionStorage.removeItem("pending_artwork_purchase"))
-            .finally(() => router.replace("/dashboard/user"));
-        } catch {
-          sessionStorage.removeItem("pending_artwork_purchase");
-        }
-      }
+    // Fallback 2: Force Artwork Purchase Database Writes (No longer requires empty sessionStorage)
+    if (purchaseSuccess === "true" && userEmail && urlArtworkId) {
+      fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          buyerEmail: userEmail, 
+          buyerName: decodeURIComponent(urlBuyerName || "Collector"), 
+          artworkId: urlArtworkId 
+        }),
+      })
+        .then((res) => res.json())
+        .then(() => {
+          toast.success("Artwork purchase logged into database!");
+          // Instantly re-fetch purchase logs to populate dashboard view items
+          return fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`);
+        })
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setPurchases(d.history || []); })
+        .catch((err) => console.error("Error confirming fallback checkout:", err))
+        .finally(() => router.replace("/dashboard/user"));
     }
   }, [searchParams, userEmail, router]);
 
-  // Fetch live subscriptionTier on load
+  // Fetch live user status tier details on dashboard mount
   useEffect(() => {
     if (userEmail) {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -108,7 +102,7 @@ function UserDashboard() {
     }
   }, [userEmail]);
 
-  // 🌟 FIX 2: FETCH HISTORICAL PURCHASES AND SET LOADING TO FALSE CLEANLY
+  // Fetch historical purchase log array
   useEffect(() => {
     if (!userEmail) return;
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -116,35 +110,15 @@ function UserDashboard() {
 
     fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`)
       .then((res) => res.json())
-      .then(async (data) => {
+      .then((data) => {
         if (data.success && data.history) {
-          const rawHistory = data.history;
-          try {
-            const artworksRes = await fetch(`${apiBaseUrl}/api/artworks`);
-            const artworksData = await artworksRes.json();
-            
-            if (artworksData.success && artworksData.artworks) {
-              const combinedHistory = rawHistory.map((tx) => {
-                const match = artworksData.artworks.find((a) => a._id === tx.artworkId);
-                return {
-                  ...tx,
-                  image: tx.image || match?.image || "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500"
-                };
-              });
-              setPurchases(combinedHistory);
-            } else {
-              setPurchases(rawHistory);
-            }
-          } catch (err) {
-            setPurchases(rawHistory);
-          }
+          setPurchases(data.history);
         }
       })
       .catch((err) => console.error("Error fetching purchases:", err))
-      .finally(() => setLoading(false)); // 🌟 Prevents landing stuck true state
+      .finally(() => setLoading(false));
   }, [userEmail]);
 
-  // Stripe checkout upgrade generator handler
   const handleUpgrade = async (tierName, costAmount) => {
     if (!userEmail) return;
     try {
@@ -156,49 +130,30 @@ function UserDashboard() {
       });
 
       const data = await response.json();
-      if (data.success && data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error(data.message || "Could not spin up payment portal instance.");
-      }
+      if (data.success && data.url) window.location.href = data.url;
     } catch (err) {
-      toast.error("Stripe handshake error.");
+      toast.error("Stripe gateway routing failure.");
     }
   };
 
-  // PROFILE UPDATE ACTION: Modify Name via Better Auth Native Client
   const handleUpdateName = async (e) => {
     e.preventDefault();
-    setProfileMessage({ success: "", error: "" });
     setUpdatingName(true);
-
     const { error } = await authClient.user.updateName({ name: newName });
-    if (error) {
-      toast.error(error.message || "Failed to update profile name.");
-    } else {
-      toast.success("Name updated successfully!");
-      setTimeout(() => window.location.reload(), 1500);
+    if (!error) { 
+      toast.success("Name updated!"); 
+      setTimeout(() => window.location.reload(), 1000); 
     }
     setUpdatingName(false);
   };
 
-  // PROFILE UPDATE ACTION: Modify Security Passwords safely
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
-    setProfileMessage({ success: "", error: "" });
     setUpdatingPassword(true);
-
-    const { error } = await authClient.changePassword({
-      currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword,
-      revokeOtherSessions: true,
-    });
-
-    if (error) {
-      toast.error(error.message || "Password modification refused.");
-    } else {
-      toast.success("Security password updated successfully!");
-      setPasswordForm({ currentPassword: "", newPassword: "" });
+    const { error } = await authClient.changePassword({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword, revokeOtherSessions: true });
+    if (!error) { 
+      toast.success("Password updated!"); 
+      setPasswordForm({ currentPassword: "", newPassword: "" }); 
     }
     setUpdatingPassword(false);
   };
@@ -216,7 +171,6 @@ function UserDashboard() {
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-10 space-y-14 font-sans">
       
-      {/* HEADER UTILITY */}
       <div>
         <h1 className="text-3xl font-black tracking-tight">User Operations Command</h1>
         <p className="text-zinc-500 text-sm mt-1">
@@ -224,7 +178,7 @@ function UserDashboard() {
         </p>
       </div>
 
-      {/* SUBSCRIPTION PLAN MODULES */}
+      {/* PLANS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { title: "Free (Default)", limit: "3 Paintings", cost: "$0", keyName: "free" },
@@ -257,7 +211,7 @@ function UserDashboard() {
         })}
       </div>
 
-      {/* BOUGHT ARTWORKS THUMBNAIL GALLERY VIEW */}
+      {/* THUMBNAILS MATRIX GALLERY */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight">Your Acquired Masterpiece Collection Gallery</h2>
@@ -272,9 +226,9 @@ function UserDashboard() {
               <Card key={index} className="bg-zinc-950 border border-zinc-900 overflow-hidden rounded-xl group hover:border-zinc-700 transition-all">
                 <div className="aspect-square w-full relative bg-zinc-900 overflow-hidden">
                   <img 
-                    src={art.image} 
+                    src={art.image || "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500"} 
                     alt={art.artworkTitle} 
-                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                    className="object-cover w-full h-full"
                   />
                 </div>
                 <div className="p-3 space-y-1">
@@ -291,7 +245,7 @@ function UserDashboard() {
         )}
       </div>
 
-      {/* TRANSACTION RECORD TABLE */}
+      {/* TABLE DATA LIST LEDGER */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold">Purchase Log Ledger</h2>
         <div className="w-full border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-950/20 backdrop-blur-md">
@@ -318,7 +272,7 @@ function UserDashboard() {
         </div>
       </div>
 
-      {/* INTEGRATED PROFILE UTILITY SYSTEM */}
+      {/* SETTINGS CONTROLS */}
       <div className="space-y-4 border-t border-zinc-900 pt-10">
         <div>
           <h2 className="text-xl font-bold">Profile Identity Settings</h2>
@@ -329,8 +283,8 @@ function UserDashboard() {
           <form onSubmit={handleUpdateName} className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Update Profile Name</h3>
             <Input label="Account Identity Username" value={newName} onChange={(e) => setNewName(e.target.value)} variant="bordered" required />
-            <Button type="submit" size="sm" disabled={updatingName} className="bg-orange-500 font-bold text-white rounded-lg cursor-pointer">
-              {updatingName ? "Saving changes..." : "Save Identity Name"}
+            <Button type="submit" size="sm" className="bg-orange-500 font-bold text-white rounded-lg">
+              Save Identity Name
             </Button>
           </form>
 
@@ -338,8 +292,8 @@ function UserDashboard() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">Modify Security Password</h3>
             <Input label="Current Password" type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})} variant="bordered" required />
             <Input label="New Secure Password" type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})} variant="bordered" required />
-            <Button type="submit" size="sm" disabled={updatingPassword} className="bg-zinc-900 border border-zinc-800 font-bold text-white rounded-lg cursor-pointer hover:bg-zinc-800">
-              {updatingPassword ? "Processing hashing algorithms..." : "Modify Password"}
+            <Button type="submit" size="sm" className="bg-zinc-900 border border-zinc-800 font-bold text-white rounded-lg">
+              Modify Password
             </Button>
           </form>
         </div>

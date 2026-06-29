@@ -27,14 +27,15 @@ function BrowseContent() {
   const categoryParam = searchParams.get("category") || "all";
   const sortParam = searchParams.get("sort") || "newest";
 
-  
+  // ✅ FIX: Use environment variable instead of hardcoded localhost
   useEffect(() => {
     setLoading(true);
-   
-    fetch("http://localhost:5000/api/artworks")
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+    fetch(`${apiBaseUrl}/api/artworks`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.artworks && data.artworks.length > 0) {
+        if (data.success && data.artworks) {
           setArtworks(data.artworks);
         }
         setLoading(false);
@@ -56,7 +57,7 @@ function BrowseContent() {
   };
 
   const filteredArtworks = artworks.filter((art) => {
-    const matchesSearch = 
+    const matchesSearch =
       art.title.toLowerCase().includes(searchParam.toLowerCase()) ||
       art.artistName.toLowerCase().includes(searchParam.toLowerCase());
     const matchesCategory = categoryParam === "all" || art.category === categoryParam;
@@ -72,13 +73,12 @@ function BrowseContent() {
   return (
     <div className="min-h-screen bg-black text-white px-6 py-12">
       <div className="max-w-7xl mx-auto space-y-10">
-        
+
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Explore Masterpieces</h1>
           <p className="text-zinc-500 text-sm mt-1">Discover elite compositions from creators globally.</p>
         </div>
 
-    
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-zinc-900/40 p-4 border border-zinc-800 rounded-2xl backdrop-blur-md">
           <div className="md:col-span-6">
             <Input
@@ -90,7 +90,7 @@ function BrowseContent() {
               variant="bordered"
             />
           </div>
-          
+
           <div className="md:col-span-3 flex flex-col justify-center">
             <select
               value={categoryParam}
@@ -105,7 +105,6 @@ function BrowseContent() {
             </select>
           </div>
 
-          
           <div className="md:col-span-3 flex flex-col justify-center">
             <select
               value={sortParam}
@@ -119,7 +118,6 @@ function BrowseContent() {
           </div>
         </div>
 
-      
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -131,7 +129,7 @@ function BrowseContent() {
             ))}
           </div>
         ) : sortedArtworks.length > 0 ? (
-          <motion.div 
+          <motion.div
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
@@ -167,10 +165,10 @@ function BrowseContent() {
           <div className="text-center py-24 border border-dashed border-zinc-800 rounded-3xl max-w-xl mx-auto space-y-3">
             <h3 className="text-xl font-bold text-zinc-300">No Masterpieces Found</h3>
             <p className="text-zinc-500 text-sm max-w-xs mx-auto">
-              We couldn't find any artwork records matching your filter settings. Try adjustments or clear search parameters!
+              We couldn&apos;t find any artwork records matching your filter settings. Try adjustments or clear search parameters!
             </p>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="bg-zinc-800 text-zinc-300 font-medium rounded-xl mt-2"
               onClick={() => router.push("/browse")}
             >
