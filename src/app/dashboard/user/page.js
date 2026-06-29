@@ -26,7 +26,6 @@ function UserDashboard() {
   const userName = session?.user?.name || "Collector";
   
   // Use liveSubscriptionTier fetched from DB — session does NOT carry subscriptionTier
-  // because auth.js additionalFields only declares "role", not "subscriptionTier"
   const activeTier = liveSubscriptionTier || "free";
 
   useEffect(() => {
@@ -39,64 +38,12 @@ function UserDashboard() {
     }
   }, [session, isPending]);
 
-  // 🌟 FIX: Dynamic Real-Time DB Verification Fallback on Stripe Redirection
+  // 🌟 FIX 1: FALLBACK REDIRECT LOGIC FOR LOCAL TESTING (HANDLES WEBHOOK GAPS)
   useEffect(() => {
     const paymentSuccess = searchParams.get("payment_success");
     const purchaseSuccess = searchParams.get("purchase_success");
 
-    // Case 1: Subscription Upgrade Live Handshake Validation Check
-    if (paymentSuccess === "true" && userEmail) {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      
-      fetch(`${apiBaseUrl}/api/admin/users`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.users) {
-            const me = data.users.find(
-              (u) => u.email.toLowerCase() === userEmail.toLowerCase()
-            );
-            if (me?.subscriptionTier) {
-              setLiveSubscriptionTier(me.subscriptionTier);
-              toast.success(`Account plan upgraded! Current Tier: ${me.subscriptionTier.toUpperCase()}`);
-            }
-          }
-          // Clear query route strings neatly
-          router.replace("/dashboard/user");
-        })
-        .catch(() => router.replace("/dashboard/user"));
-    }
-
-    // Case 2: Existing Artwork Purchase Fallback Handler
-    if (purchaseSuccess === "true" && userEmail) {
-      const pending = sessionStorage.getItem("pending_artwork_purchase");
-      if (pending) {
-        try {
-          const { artworkId, buyerName } = JSON.parse(pending);
-          const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-          fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ buyerEmail: userEmail, buyerName, artworkId }),
-          })
-            .then(() => {
-              sessionStorage.removeItem("pending_artwork_purchase");
-              toast.success("Artwork purchase successfully logged into history logs!");
-              router.replace("/dashboard/user");
-            })
-            .catch(() => sessionStorage.removeItem("pending_artwork_purchase"));
-        } catch {
-          sessionStorage.removeItem("pending_artwork_purchase");
-        }
-      }
-    }
-  }, [searchParams, userEmail, router]);
-
-  // Fetch live subscriptionTier directly from DB — session doesn't carry it
-  // 🌟 UPDATE 1: Handle immediate post-payment upgrades via the precise profile endpoint
-  useEffect(() => {
-    const paymentSuccess = searchParams.get("payment_success");
-    const purchaseSuccess = searchParams.get("purchase_success");
-
+    // Case A: Subscription Upgrade Fallback
     if (paymentSuccess === "true" && userEmail) {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
       
@@ -112,23 +59,33 @@ function UserDashboard() {
         .catch(() => router.replace("/dashboard/user"));
     }
 
+    // Case B: Artwork Purchase Fallback
     if (purchaseSuccess === "true" && userEmail) {
       const pending = sessionStorage.getItem("pending_artwork_purchase");
       if (pending) {
         try {
           const { artworkId, buyerName } = JSON.parse(pending);
           const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+          
           fetch(`${apiBaseUrl}/api/payment/confirm-purchase`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ buyerEmail: userEmail, buyerName, artworkId }),
           })
-            .then(() => {
+            .then((res) => res.json())
+            .then((resData) => {
               sessionStorage.removeItem("pending_artwork_purchase");
               toast.success("Artwork purchase successfully logged!");
-              router.replace("/dashboard/user");
+              
+              // 🌟 Re-fetch purchases list immediately so tables populate on fallback redirect
+              return fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`);
             })
-            .catch(() => sessionStorage.removeItem("pending_artwork_purchase"));
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.success && d.history) setPurchases(d.history);
+            })
+            .catch(() => sessionStorage.removeItem("pending_artwork_purchase"))
+            .finally(() => router.replace("/dashboard/user"));
         } catch {
           sessionStorage.removeItem("pending_artwork_purchase");
         }
@@ -136,7 +93,7 @@ function UserDashboard() {
     }
   }, [searchParams, userEmail, router]);
 
-  // 🌟 UPDATE 2: Standard initial page mount profile loader
+  // Fetch live subscriptionTier on load
   useEffect(() => {
     if (userEmail) {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -151,7 +108,43 @@ function UserDashboard() {
     }
   }, [userEmail]);
 
-  // Stripe checkout generation handler
+  // 🌟 FIX 2: FETCH HISTORICAL PURCHASES AND SET LOADING TO FALSE CLEANLY
+  useEffect(() => {
+    if (!userEmail) return;
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    setLoading(true);
+
+    fetch(`${apiBaseUrl}/api/user/purchases?email=${encodeURIComponent(userEmail)}`)
+      .then((res) => res.json())
+      .then(async (data) => {
+        if (data.success && data.history) {
+          const rawHistory = data.history;
+          try {
+            const artworksRes = await fetch(`${apiBaseUrl}/api/artworks`);
+            const artworksData = await artworksRes.json();
+            
+            if (artworksData.success && artworksData.artworks) {
+              const combinedHistory = rawHistory.map((tx) => {
+                const match = artworksData.artworks.find((a) => a._id === tx.artworkId);
+                return {
+                  ...tx,
+                  image: tx.image || match?.image || "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=500"
+                };
+              });
+              setPurchases(combinedHistory);
+            } else {
+              setPurchases(rawHistory);
+            }
+          } catch (err) {
+            setPurchases(rawHistory);
+          }
+        }
+      })
+      .catch((err) => console.error("Error fetching purchases:", err))
+      .finally(() => setLoading(false)); // 🌟 Prevents landing stuck true state
+  }, [userEmail]);
+
+  // Stripe checkout upgrade generator handler
   const handleUpgrade = async (tierName, costAmount) => {
     if (!userEmail) return;
     try {
@@ -159,11 +152,7 @@ function UserDashboard() {
       const response = await fetch(`${apiBaseUrl}/api/payment/create-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: userEmail,
-          tier: tierName,
-          priceAmount: costAmount
-        })
+        body: JSON.stringify({ email: userEmail, tier: tierName, priceAmount: costAmount })
       });
 
       const data = await response.json();
@@ -173,8 +162,7 @@ function UserDashboard() {
         toast.error(data.message || "Could not spin up payment portal instance.");
       }
     } catch (err) {
-      console.error("❌ Error running upgrade pipeline session:", err);
-      toast.error("Stripe routing handshake failed.");
+      toast.error("Stripe handshake error.");
     }
   };
 
@@ -185,12 +173,9 @@ function UserDashboard() {
     setUpdatingName(true);
 
     const { error } = await authClient.user.updateName({ name: newName });
-    
     if (error) {
-      setProfileMessage({ success: "", error: error.message || "Failed to update profile name." });
       toast.error(error.message || "Failed to update profile name.");
     } else {
-      setProfileMessage({ success: "Name updated successfully! Reloading session profile...", error: "" });
       toast.success("Name updated successfully!");
       setTimeout(() => window.location.reload(), 1500);
     }
@@ -210,10 +195,8 @@ function UserDashboard() {
     });
 
     if (error) {
-      setProfileMessage({ success: "", error: error.message || "Password adjustment transaction denied." });
       toast.error(error.message || "Password modification refused.");
     } else {
-      setProfileMessage({ success: "Security password adjusted successfully!", error: "" });
       toast.success("Security password updated successfully!");
       setPasswordForm({ currentPassword: "", newPassword: "" });
     }
@@ -341,14 +324,6 @@ function UserDashboard() {
           <h2 className="text-xl font-bold">Profile Identity Settings</h2>
           <p className="text-zinc-500 text-xs mt-0.5">Modify workspace operational display parameters and security credentials.</p>
         </div>
-
-        {(profileMessage.success || profileMessage.error) && (
-          <div className={`p-4 rounded-xl border text-sm font-bold text-center max-w-2xl ${
-            profileMessage.success ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"
-          }`}>
-            {profileMessage.success || profileMessage.error}
-          </div>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
           <form onSubmit={handleUpdateName} className="bg-zinc-950 border border-zinc-900 p-6 rounded-2xl space-y-4">
