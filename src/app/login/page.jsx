@@ -51,17 +51,20 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-  try {
-    await authClient.signIn.social({
-      provider: "google",
-      //  Explicitly point the callback back to your frontend app destination
-      callbackURL: `${window.location.origin}/dashboard`, 
-    });
-  } catch (error) {
-    console.error("Google sign in error:", error);
-  }
-};
+ const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        //  Bypasses environment variable build bugs by resolving your production URL dynamically at runtime
+        callbackURL: `${window.location.origin}/`,
+      });
+    } catch (err) {
+      setError("Google authentication could not be initiated.");
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-[85vh] flex flex-col items-center justify-center bg-gray-50 px-4 py-12 font-sans">
