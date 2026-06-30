@@ -52,21 +52,16 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    setError("");
-    setGoogleLoading(true);
-    try {
-      await authClient.signIn.social({
-        provider: "google",
-        //  Force Google to bring the authenticated user back to the frontend production app or local fallback!
-        callbackURL: process.env.NEXT_PUBLIC_APP_URL 
-          ? `${process.env.NEXT_PUBLIC_APP_URL}/` 
-          : "http://localhost:3000/",
-      });
-    } catch (err) {
-      setError("Google authentication could not be initiated.");
-      setGoogleLoading(false);
-    }
-  };
+  try {
+    await authClient.signIn.social({
+      provider: "google",
+      //  Explicitly point the callback back to your frontend app destination
+      callbackURL: `${window.location.origin}/dashboard`, 
+    });
+  } catch (error) {
+    console.error("Google sign in error:", error);
+  }
+};
 
   return (
     <div className="min-h-[85vh] flex flex-col items-center justify-center bg-gray-50 px-4 py-12 font-sans">
