@@ -1,4 +1,4 @@
-# ArtHub 🎨✨
+# ArtHub 
 
 ### 🌐 [Live Project URL](https://arthub-mauve.vercel.app)
 
