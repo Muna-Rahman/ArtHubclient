@@ -102,7 +102,7 @@ Follow these steps to configure and boot ArtHub in your local environment.
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/arthub.git
+git clone https://github.com/Muna-Rahman/arthub.git
 cd arthub
 ```
 
